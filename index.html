@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Pong Mini App</title>
+  <style>
+    :root {
+      --bg: #020617;
+      --panel: rgba(15, 23, 42, 0.84);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at top, #172554, #020617 70%);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      overscroll-behavior: none;
+      touch-action: manipulation;
+    }
+
+    .app {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 6px;
+      min-height: 100dvh;
+      padding:
+        calc(6px + var(--safe-top))
+        calc(6px + var(--safe-right))
+        calc(6px + var(--safe-bottom))
+        calc(6px + var(--safe-left));
+    }
+
+    .hud {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 6px 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+    }
+
+    .left-group,
+    .right-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .right-group {
+      justify-content: flex-end;
+    }
+
+    .score {
+      text-align: center;
+      font-size: clamp(18px, 4vw, 30px);
+      font-weight: 800;
+      letter-spacing: 2px;
+      white-space: nowrap;
+    }
+
+    .badge {
+      padding: 6px 9px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.07);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .btn {
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 8px 10px;
+      min-width: 64px;
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .btn.primary {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: transparent;
+    }
+
+    .btn.selected {
+      background: rgba(56, 189, 248, 0.18);
+      border-color: rgba(56, 189, 248, 0.5);
+      color: #e0f2fe;
+      box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.15);
+    }
+
+    .board-wrap {
+      position: relative;
+      min-height: 0;
+      height: 100%;
+      width: 100%;
+      max-width: 100%;
+      margin: 0 auto;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: #020617;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.3);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(180deg, #020617, #0b1120);
+      touch-action: none;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      text-align: center;
+      background: rgba(2, 6, 23, 0.58);
+      z-index: 5;
+    }
+
+    .card {
+      width: min(92vw, 520px);
+      max-height: min(86vh, 720px);
+      overflow: auto;
+      padding: 20px 16px;
+      border-radius: 22px;
+      background: rgba(15, 23, 42, 0.94);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.28);
+    }
+
+    .card h1 {
+      margin: 0 0 10px;
+      font-size: clamp(24px, 6vw, 38px);
+    }
+
+    .card p {
+      margin: 0 0 14px;
+      line-height: 1.45;
+      color: #cbd5e1;
+      font-size: 15px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .side-picker,
+    .theme-picker {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 12px 0 16px;
+    }
+
+    .theme-picker {
+      margin-top: 8px;
+    }
+
+    .side-note,
+    .theme-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: -4px;
+      margin-bottom: 12px;
+    }
+
+    .leaderboard-box {
+      margin-top: 14px;
+      text-align: left;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.04);
+    }
+
+    .leaderboard-header,
+    .leaderboard-row {
+      display: grid;
+      grid-template-columns: 54px 1fr 80px;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 12px;
+    }
+
+    .leaderboard-header {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--muted);
+      background: rgba(255,255,255,0.04);
+      text-transform: uppercase;
+    }
+
+    .leaderboard-row {
+      border-top: 1px solid rgba(255,255,255,0.06);
+      font-size: 14px;
+    }
+
+    .leaderboard-row.me {
+      background: rgba(56, 189, 248, 0.12);
+    }
+
+    .leaderboard-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .leaderboard-empty,
+    .leaderboard-status {
+      padding: 14px 12px;
+      color: #cbd5e1;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .small-note {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .name-input {
+      width: 100%;
+      margin: 6px 0 14px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+    }
+
+    .name-input::placeholder {
+      color: #94a3b8;
+    }
+
+    .name-error {
+      min-height: 18px;
+      margin: -4px 0 10px;
+      color: #fda4af;
+      font-size: 12px;
+    }
+
+    @media (max-width: 700px) {
+      .hud {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+          'left right'
+          'score score';
+      }
+      .left-group { grid-area: left; }
+      .right-group { grid-area: right; }
+      .score { grid-area: score; }
+    }
+
+    @media (max-width: 900px) and (orientation: landscape) {
+      .app {
+        gap: 4px;
+        padding:
+          calc(4px + var(--safe-top))
+          calc(4px + var(--safe-right))
+          calc(4px + var(--safe-bottom))
+          calc(4px + var(--safe-left));
+      }
+      .hud {
+        min-height: 38px;
+        padding: 4px 6px;
+      }
+      .score {
+        font-size: clamp(18px, 4vw, 24px);
+      }
+      .btn {
+        min-width: 58px;
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+    }
+
+    @media (max-width: 900px) and (orientation: portrait) {
+      .hud {
+        min-height: 40px;
+        padding: 5px 6px;
+      }
+      .score {
+        font-size: clamp(18px, 6vw, 24px);
+      }
+      .btn {
+        min-width: 54px;
+        padding: 6px 7px;
+        font-size: 12px;
+      }
+      .badge {
+        max-width: 96px;
+      }
+      .board-wrap {
+        width: min(100%, 94vw);
+      }
+    }
+      .score {
+        font-size: clamp(18px, 6vw, 24px);
+      }
+      .btn {
+        min-width: 54px;
+        padding: 6px 7px;
+        font-size: 12px;
+      }
+      .badge {
+        max-width: 96px;
+      }
+      .board-wrap {
+        width: min(100%, 78vw);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="hud">
+      <div class="left-group">
+        <div class="badge" id="platformBadge">Mini App</div>
+        <button class="btn" id="fullscreenBtn" type="button">Полный экран</button>
+        <button class="btn" id="leaderboardBtn" type="button" style="display:none;">ТОП игроков в Telegram</button>
+        <button class="btn" id="changeNameBtn" type="button" style="display:none;">Имя</button>
+      </div>
+      <div class="score" id="score">0 : 0</div>
+      <div class="right-group">
+        <button class="btn" id="pauseTopBtn" type="button">Пауза</button>
+      </div>
+    </div>
+
+    <div class="board-wrap" id="boardWrap">
+      <canvas id="game" aria-label="Pong game"></canvas>
+
+      <div class="overlay" id="startOverlay">
+        <div class="card">
+          <h1>Pong</h1>
+          <p>Веди пальцем по своей половине игрового поля, чтобы двигать ракетку. На компьютере работают W / S, стрелки ↑ / ↓ и колесо мыши.</p>
+          <div class="side-picker">
+            <button class="btn" id="sideLeftBtn" type="button">Играть слева</button>
+            <button class="btn" id="sideRightBtn" type="button">Играть справа</button>
+          </div>
+          <div class="side-note" id="sideNote">Сторона сохранится для следующего запуска.</div>
+          <div class="theme-picker">
+            <button class="btn" id="themeClassicBtn" type="button">Классика</button>
+            <button class="btn" id="themeNeonBtn" type="button">Неон</button>
+            <button class="btn" id="themeSunsetBtn" type="button">Закат</button>
+            <button class="btn" id="themeMonoBtn" type="button">Моно</button>
+          </div>
+          <div class="theme-note" id="themeNote">Стиль игры меняет фон, мяч, ракетки и акценты интерфейса.</div>
+          <div class="actions">
+            <button class="btn primary" id="startBtn" type="button">Играть</button>
+            <button class="btn" id="resetOverlayBtn" type="button" style="display: none;">Сброс</button>
+            <button class="btn" id="showLeaderboardFromStartBtn" type="button">ТОП игроков в telegram</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="messageOverlay" style="display:none;">
+        <div class="card">
+          <h1 id="messageTitle">Пауза</h1>
+          <p id="messageText">Нажми продолжить, чтобы вернуться в игру.</p>
+          <div class="actions">
+            <button class="btn primary" id="resumeBtn" type="button">Продолжить</button>
+            <button class="btn" id="restartOverlayBtn" type="button">Рестарт</button>
+            <button class="btn" id="showLeaderboardFromResultBtn" type="button">ТОП игроков в telegram</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="leaderboardOverlay" style="display:none;">
+        <div class="card">
+          <h1>ТОП игроков</h1>
+          <p id="leaderboardSubtitle">Лучшие результаты среди игроков Telegram.</p>
+          <div class="leaderboard-box">
+            <div class="leaderboard-header">
+              <div>#</div>
+              <div>Игрок</div>
+              <div>Счёт</div>
+            </div>
+            <div id="leaderboardContent"><div class="leaderboard-status">Загрузка...</div></div>
+          </div>
+          <div class="actions" style="margin-top:14px;">
+            <button class="btn primary" id="closeLeaderboardBtn" type="button">Закрыть</button>
+            <button class="btn" id="refreshLeaderboardBtn" type="button">Обновить</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="nameOverlay" style="display:none;">
+        <div class="card">
+          <h1>Имя игрока</h1>
+          <p>В браузере имя не приходит автоматически, поэтому введи, как тебя показывать в ТОПе.</p>
+          <input class="name-input" id="browserNameInput" type="text" maxlength="24" placeholder="Например, shevd" />
+          <div class="name-error" id="browserNameError"></div>
+          <div class="actions">
+            <button class="btn primary" id="saveBrowserNameBtn" type="button">Сохранить</button>
+            <button class="btn" id="cancelBrowserNameBtn" type="button">Отмена</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    'use strict';
+
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    const isTelegram = !!(tg && tg.initData);
+    const $ = (id) => document.getElementById(id);
+    const canvas = $('game');
+    const ctx = canvas.getContext('2d');
+    const boardWrap = $('boardWrap');
+    const scoreEl = $('score');
+    const platformBadge = $('platformBadge');
+    const fullscreenBtn = $('fullscreenBtn');
+    const leaderboardBtn = $('leaderboardBtn');
+    const changeNameBtn = $('changeNameBtn');
+    const pauseTopBtn = $('pauseTopBtn');
+    const startBtn = $('startBtn');
+    const resetOverlayBtn = $('resetOverlayBtn');
+    const sideLeftBtn = $('sideLeftBtn');
+    const sideRightBtn = $('sideRightBtn');
+    const sideNote = $('sideNote');
+    const themeClassicBtn = $('themeClassicBtn');
+    const themeNeonBtn = $('themeNeonBtn');
+    const themeSunsetBtn = $('themeSunsetBtn');
+    const themeMonoBtn = $('themeMonoBtn');
+    const themeNote = $('themeNote');
+    const showLeaderboardFromStartBtn = $('showLeaderboardFromStartBtn');
+    const showLeaderboardFromResultBtn = $('showLeaderboardFromResultBtn');
+    const resumeBtn = $('resumeBtn');
+    const restartOverlayBtn = $('restartOverlayBtn');
+    const startOverlay = $('startOverlay');
+    const messageOverlay = $('messageOverlay');
+    const leaderboardOverlay = $('leaderboardOverlay');
+    const nameOverlay = $('nameOverlay');
+    const messageTitle = $('messageTitle');
+    const messageText = $('messageText');
+    const leaderboardContent = $('leaderboardContent');
+    const leaderboardSubtitle = $('leaderboardSubtitle');
+    const leaderboardNote = $('leaderboardNote');
+    const closeLeaderboardBtn = $('closeLeaderboardBtn');
+    const refreshLeaderboardBtn = $('refreshLeaderboardBtn');
+    const browserNameInput = $('browserNameInput');
+    const browserNameError = $('browserNameError');
+    const saveBrowserNameBtn = $('saveBrowserNameBtn');
+    const cancelBrowserNameBtn = $('cancelBrowserNameBtn');
+    const app = document.querySelector('.app');
+    const hud = document.querySelector('.hud');
+
+    if (!canvas || !ctx || !boardWrap) throw new Error('Canvas initialization failed');
+
+    const state = {
+      started: false,
+      running: false,
+      gameOver: false,
+      dragging: false,
+      animationId: null,
+      winningScore: 10,
+      playerScore: 0,
+      aiScore: 0,
+      width: 0,
+      height: 0,
+      dpr: Math.max(1, Math.min(window.devicePixelRatio || 1, 2)),
+      keys: Object.create(null),
+      isDesktopLike: matchMedia('(pointer:fine)').matches,
+      isMobileLike: matchMedia('(pointer:coarse)').matches,
+      leaderboardOpen: false,
+      overlayBeforeLeaderboard: 'start',
+      telegramUser: null,
+      browserPlayerName: '',
+      apiBaseUrl: '',
+      nameOverlaySource: 'start',
+      servePending: false,
+      serveDirection: 1,
+      serveStartAt: 0,
+      serveDelayMs: 900,
+      serveCountdownText: '',
+      playerSide: 'left',
+      theme: 'classic',
+      playerTargetY: 0
+    };
+
+    const world = {
+      paddleWidth: 16,
+      paddleHeight: 110,
+      paddleMargin: 26,
+      leftY: 0,
+      rightY: 0,
+      playerSpeed: 8,
+      aiSpeed: 6.1,
+      ballSize: 14,
+      ballX: 0,
+      ballY: 0,
+      ballVX: 0,
+      ballVY: 0,
+      baseBallSpeed: 6,
+      maxBallSpeed: 13
+    };
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function getSideKey() { return 'pong_player_side_v1'; }
+    function readPlayerSide() {
+      try {
+        const value = localStorage.getItem(getSideKey());
+        return value === 'right' ? 'right' : 'left';
+      } catch {
+        return 'left';
+      }
+    }
+    function writePlayerSide(side) {
+      try { localStorage.setItem(getSideKey(), side); } catch (error) { console.warn('Unable to save player side', error); }
+    }
+
+    function getThemeKey() { return 'pong_theme_v1'; }
+    function readTheme() {
+      try {
+        const value = localStorage.getItem(getThemeKey());
+        return ['classic', 'neon', 'sunset', 'mono'].includes(value) ? value : 'classic';
+      } catch {
+        return 'classic';
+      }
+    }
+    function writeTheme(theme) {
+      try { localStorage.setItem(getThemeKey(), theme); } catch (error) { console.warn('Unable to save theme', error); }
+    }
+
+    function getBrowserNameKey() { return 'pong_browser_player_name_v1'; }
+    function readBrowserName() {
+      try { return (localStorage.getItem(getBrowserNameKey()) || '').trim(); } catch { return ''; }
+    }
+    function writeBrowserName(name) {
+      try { localStorage.setItem(getBrowserNameKey(), name); } catch (error) { console.warn('Unable to save browser name', error); }
+    }
+    function sanitizeBrowserName(name) {
+      return String(name || '').replace(/\s+/g, ' ').replace(/[<>]/g, '').trim().slice(0, 24);
+    }
+
+    function getTelegramUser() {
+      if (!isTelegram) return null;
+      return (tg.initDataUnsafe && tg.initDataUnsafe.user) || null;
+    }
+    function getDisplayName(user) {
+      if (!user) return 'Гость';
+      if (user.username) return `@${user.username}`;
+      const full = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+      return full || `id${user.id || ''}`;
+    }
+
+    function playerIsLeft() {
+      return state.playerSide === 'left';
+    }
+
+    function setSafeArea(top, right, bottom, left) {
+      document.documentElement.style.setProperty('--safe-top', `${top || 0}px`);
+      document.documentElement.style.setProperty('--safe-right', `${right || 0}px`);
+      document.documentElement.style.setProperty('--safe-bottom', `${bottom || 0}px`);
+      document.documentElement.style.setProperty('--safe-left', `${left || 0}px`);
+    }
+
+    function updatePlatformBadge() {
+      if (state.telegramUser) platformBadge.textContent = getDisplayName(state.telegramUser);
+      else if (state.browserPlayerName) platformBadge.textContent = state.browserPlayerName;
+      else platformBadge.textContent = 'Гость';
+    }
+
+    function applyPlayerSideUI() {
+      sideLeftBtn.classList.toggle('selected', state.playerSide === 'left');
+      sideRightBtn.classList.toggle('selected', state.playerSide === 'right');
+      sideNote.textContent = state.playerSide === 'left' ? 'Сейчас твоя ракетка будет слева.' : 'Сейчас твоя ракетка будет справа.';
+    }
+
+    function applyThemeUI() {
+      themeClassicBtn.classList.toggle('selected', state.theme === 'classic');
+      themeNeonBtn.classList.toggle('selected', state.theme === 'neon');
+      themeSunsetBtn.classList.toggle('selected', state.theme === 'sunset');
+      themeMonoBtn.classList.toggle('selected', state.theme === 'mono');
+      const labels = {
+        classic: 'Классический стиль с холодным тёмным фоном.',
+        neon: 'Неоновый стиль с яркими акцентами и сиянием.',
+        sunset: 'Тёплый стиль с закатными оттенками.',
+        mono: 'Минималистичный монохромный стиль.'
+      };
+      themeNote.textContent = labels[state.theme] || labels.classic;
+    }
+
+    function setPlayerSide(side) {
+      state.playerSide = side === 'right' ? 'right' : 'left';
+      writePlayerSide(state.playerSide);
+      applyPlayerSideUI();
+      if (!state.started) {
+        centerPaddles();
+        draw();
+      }
+    }
+
+    function setTheme(theme) {
+      state.theme = ['classic', 'neon', 'sunset', 'mono'].includes(theme) ? theme : 'classic';
+      writeTheme(state.theme);
+      applyThemeUI();
+      resizeCanvas();
+      draw();
+    }
+
+    function getThemePalette() {
+      switch (state.theme) {
+        case 'neon':
+          return { top: '#020617', bottom: '#111827', line: 'rgba(34, 211, 238, 0.4)', player: '#22d3ee', ai: '#f472b6', ball: '#fde047', glow: 'rgba(34, 211, 238, 0.28)', board: '#020617' };
+        case 'sunset':
+          return { top: '#3b0764', bottom: '#7c2d12', line: 'rgba(253, 186, 116, 0.32)', player: '#fb7185', ai: '#fdba74', ball: '#fef08a', glow: 'rgba(251, 113, 133, 0.22)', board: '#2e1065' };
+        case 'mono':
+          return { top: '#0a0a0a', bottom: '#262626', line: 'rgba(255,255,255,0.18)', player: '#fafafa', ai: '#a3a3a3', ball: '#ffffff', glow: 'rgba(255,255,255,0.14)', board: '#111111' };
+        default:
+          return { top: '#020617', bottom: '#0b1120', line: 'rgba(255,255,255,0.16)', player: '#e2e8f0', ai: '#cbd5e1', ball: '#f8fafc', glow: 'rgba(56, 189, 248, 0.14)', board: '#020617' };
+      }
+    }
+
+    function ensureBrowserNameForUI() {
+      changeNameBtn.style.display = 'none';
+      state.browserPlayerName = readBrowserName();
+      updatePlatformBadge();
+    }
+
+    function initTelegram() {
+      state.playerSide = readPlayerSide();
+      state.theme = readTheme();
+      applyPlayerSideUI();
+      applyThemeUI();
+      if (!isTelegram) {
+        platformBadge.textContent = 'Browser';
+        fullscreenBtn.style.display = 'none';
+        leaderboardSubtitle.textContent = 'Рейтинг сохраняется только для игроков Telegram.';
+        ensureBrowserNameForUI();
+        return;
+      }
+      state.telegramUser = getTelegramUser();
+      updatePlatformBadge();
+      if (typeof tg.ready === 'function') tg.ready();
+      if (typeof tg.expand === 'function') tg.expand();
+      if (typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes();
+      if (typeof tg.setHeaderColor === 'function') tg.setHeaderColor('#0b1220');
+      if (typeof tg.setBackgroundColor === 'function') tg.setBackgroundColor('#020617');
+      if (typeof tg.requestFullscreen !== 'function') fullscreenBtn.style.display = 'none';
+      changeNameBtn.style.display = 'none';
+      const applyInsets = () => {
+        const inset = tg.contentSafeAreaInset || tg.safeAreaInset;
+        if (inset) setSafeArea(inset.top, inset.right, inset.bottom, inset.left);
+      };
+      applyInsets();
+      if (typeof tg.onEvent === 'function') {
+        tg.onEvent('safeAreaChanged', applyInsets);
+        tg.onEvent('contentSafeAreaChanged', applyInsets);
+      }
+    }
+
+    function centerPaddles() {
+      world.leftY = state.height / 2 - world.paddleHeight / 2;
+      world.rightY = state.height / 2 - world.paddleHeight / 2;
+      state.playerTargetY = playerIsLeft() ? world.leftY : world.rightY;
+    }
+
+    function centerBall() {
+      world.ballX = state.width / 2;
+      world.ballY = state.height / 2;
+    }
+
+    function playerPaddle() {
+      const isLeft = playerIsLeft();
+      return {
+        side: isLeft ? 'left' : 'right',
+        x: isLeft ? world.paddleMargin : state.width - world.paddleMargin - world.paddleWidth,
+        y: isLeft ? world.leftY : world.rightY,
+        w: world.paddleWidth,
+        h: world.paddleHeight
+      };
+    }
+
+    function aiPaddle() {
+      const isLeft = !playerIsLeft();
+      return {
+        side: isLeft ? 'left' : 'right',
+        x: isLeft ? world.paddleMargin : state.width - world.paddleMargin - world.paddleWidth,
+        y: isLeft ? world.leftY : world.rightY,
+        w: world.paddleWidth,
+        h: world.paddleHeight
+      };
+    }
+
+    function resetBall(direction) {
+      centerBall();
+      const serveDir = direction || (Math.random() > 0.5 ? 1 : -1);
+      const angle = Math.random() * 1.1 - 0.55;
+      world.ballVX = Math.cos(angle) * world.baseBallSpeed * serveDir;
+      world.ballVY = Math.sin(angle) * world.baseBallSpeed * 1.3;
+      if (Math.abs(world.ballVY) < 1.8) world.ballVY = 1.8 * (Math.random() > 0.5 ? 1 : -1);
+    }
+
+    function beginServe(direction) {
+      centerBall();
+      world.ballVX = 0;
+      world.ballVY = 0;
+      state.servePending = true;
+      state.serveDirection = direction || (Math.random() > 0.5 ? 1 : -1);
+      state.serveStartAt = performance.now();
+      state.serveCountdownText = '3';
+    }
+
+    function releaseServe() {
+      state.servePending = false;
+      state.serveCountdownText = '';
+      resetBall(state.serveDirection);
+    }
+
+    function updateScore() {
+      scoreEl.textContent = playerIsLeft() ? `${state.playerScore} : ${state.aiScore}` : `${state.aiScore} : ${state.playerScore}`;
+    }
+
+    function computeBoardHeight() {
+      const styles = getComputedStyle(app);
+      const gap = parseFloat(styles.rowGap || styles.gap || '0') || 0;
+      const padTop = parseFloat(styles.paddingTop || '0') || 0;
+      const padBottom = parseFloat(styles.paddingBottom || '0') || 0;
+      const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      const hudHeight = hud ? hud.getBoundingClientRect().height : 0;
+      return Math.max(220, Math.floor(viewportHeight - padTop - padBottom - hudHeight - gap));
+    }
+
+    function resizeCanvas() {
+      state.isMobileLike = matchMedia('(pointer:coarse)').matches;
+      const isPortraitPhone = window.matchMedia('(max-width: 900px) and (orientation: portrait)').matches;
+      boardWrap.style.width = isPortraitPhone ? `min(100%, ${Math.max(300, Math.floor(window.innerWidth * 0.94))}px)` : '100%';
+      boardWrap.style.background = getThemePalette().board;
+      boardWrap.style.height = `${computeBoardHeight()}px`;
+      const rect = boardWrap.getBoundingClientRect();
+      state.width = Math.max(260, Math.floor(rect.width));
+      state.height = Math.max(220, Math.floor(rect.height));
+      canvas.width = Math.floor(state.width * state.dpr);
+      canvas.height = Math.floor(state.height * state.dpr);
+      ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+
+      const isPortrait = window.matchMedia('(orientation: portrait)').matches;
+      let paddleHeight = Math.max(70, Math.min(isPortrait ? 112 : 128, state.height * (isPortrait ? 0.18 : 0.24)));
+      if (state.isMobileLike) paddleHeight *= isPortrait ? 1.32 : 1.12;
+      world.paddleHeight = Math.min(paddleHeight * 0.8, state.height * 0.42);
+      world.paddleWidth = Math.max(12, Math.min(18, state.width * 0.02));
+      world.paddleMargin = Math.max(10, Math.min(26, state.width * (isPortrait ? 0.04 : 0.03)));
+      world.ballSize = Math.max(10, Math.min(16, state.width * 0.016));
+      world.playerSpeed = Math.max(6, Math.min(11, state.height * (isPortrait ? 0.016 : 0.02)));
+      world.aiSpeed = state.isMobileLike
+        ? Math.max(3.5, Math.min(6.1, state.height * (isPortrait ? 0.008 : 0.0095)))
+        : Math.max(4.5, Math.min(8, state.height * (isPortrait ? 0.01 : 0.012)));
+      world.baseBallSpeed = state.isMobileLike
+        ? Math.max(3.6, Math.min(5.1, state.width * (isPortrait ? 0.0085 : 0.007)))
+        : Math.max(4.4, Math.min(7.2, state.width * (isPortrait ? 0.012 : 0.008)));
+      world.maxBallSpeed = state.isMobileLike ? world.baseBallSpeed * 1.55 : world.baseBallSpeed * 2.15;
+
+      if (!state.started) {
+        centerPaddles();
+        centerBall();
+      } else {
+        world.leftY = clamp(world.leftY, 0, state.height - world.paddleHeight);
+        world.rightY = clamp(world.rightY, 0, state.height - world.paddleHeight);
+        state.playerTargetY = clamp(state.playerTargetY, 0, state.height - world.paddleHeight);
+        world.ballX = clamp(world.ballX, world.ballSize / 2, state.width - world.ballSize / 2);
+        world.ballY = clamp(world.ballY, world.ballSize / 2, state.height - world.ballSize / 2);
+      }
+      draw();
+    }
+
+    function getLocalLeaderboardKey() { return 'pong_leaderboard_v1'; }
+    function readLocalLeaderboard() {
+      try {
+        const raw = localStorage.getItem(getLocalLeaderboardKey());
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch { return []; }
+    }
+    function writeLocalLeaderboard(entries) {
+      try { localStorage.setItem(getLocalLeaderboardKey(), JSON.stringify(entries)); } catch (error) { console.warn('Unable to save local leaderboard', error); }
+    }
+    function normalizeLeaderboardEntry(entry) {
+      return { userId: entry.userId || entry.user_id || null, username: entry.username || null, name: entry.name || entry.display_name || 'Игрок', score: Number(entry.score) || 0 };
+    }
+    function mergeLocalScore(user, score) {
+      const entries = readLocalLeaderboard().map(normalizeLeaderboardEntry);
+      const isTelegram = !!(user && user.id);
+      const userId = isTelegram ? String(user.id) : `browser:${state.browserPlayerName || 'player'}`;
+      const username = isTelegram && user.username ? user.username : null;
+      const name = isTelegram ? getDisplayName(user) : (state.browserPlayerName || 'Игрок браузера');
+      const existing = entries.find((item) => String(item.userId) === userId);
+      if (existing) {
+        existing.score = Math.max(existing.score, score);
+        existing.name = name;
+        existing.username = username;
+      } else {
+        entries.push({ userId, username, name, score });
+      }
+      entries.sort((a, b) => b.score - a.score);
+      const trimmed = entries.slice(0, 10);
+      writeLocalLeaderboard(trimmed);
+      return trimmed;
+    }
+
+    function setLeaderboardLoading(text) {
+      leaderboardContent.innerHTML = `<div class="leaderboard-status">${text}</div>`;
+    }
+
+    function renderLeaderboard(entries) {
+      const currentBrowserId = !state.telegramUser && state.browserPlayerName ? `browser:${state.browserPlayerName}` : null;
+      if (!entries.length) {
+        leaderboardContent.innerHTML = '<div class="leaderboard-empty">Пока нет результатов.</div>';
+        return;
+      }
+      leaderboardContent.innerHTML = entries.map((entry, index) => {
+        const row = normalizeLeaderboardEntry(entry);
+        const isMe = state.telegramUser ? row.userId && String(row.userId) === String(state.telegramUser.id) : currentBrowserId && String(row.userId) === currentBrowserId;
+        const safeName = (row.username ? `@${row.username}` : row.name).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<div class="leaderboard-row${isMe ? ' me' : ''}"><div>${index + 1}</div><div class="leaderboard-name">${safeName}</div><div>${row.score}</div></div>`;
+      }).join('');
+    }
+
+    async function fetchLeaderboard() {
+      try {
+        const url = state.apiBaseUrl ? `${state.apiBaseUrl}/api/leaderboard.php` : '/api/leaderboard.php';
+        const response = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const entries = Array.isArray(payload) ? payload : (Array.isArray(payload.items) ? payload.items : []);
+        renderLeaderboard(entries.map(normalizeLeaderboardEntry));
+      } catch (error) {
+        console.warn('Leaderboard fetch failed, fallback to local leaderboard', error);
+        leaderboardNote.innerHTML = 'API недоступен, поэтому показан локальный рейтинг. Проверь серверный маршрут <code>/api/leaderboard.php</code>.';
+        renderLeaderboard(readLocalLeaderboard());
+      }
+    }
+
+    async function submitScore(score) {
+      const user = state.telegramUser || getTelegramUser();
+      mergeLocalScore(user, score);
+      const payload = {
+        userId: user && user.id ? user.id : `browser:${state.browserPlayerName || 'player'}`,
+        username: user && user.username ? user.username : null,
+        firstName: user && user.first_name ? user.first_name : (state.browserPlayerName || 'Browser'),
+        lastName: user && user.last_name ? user.last_name : '',
+        name: user ? null : (state.browserPlayerName || 'Игрок браузера'),
+        score,
+        initData: tg && typeof tg.initData === 'string' ? tg.initData : ''
+      };
+      try {
+        const url = state.apiBaseUrl ? `${state.apiBaseUrl}/api/score.php` : '/api/score.php';
+        await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) });
+      } catch (error) {
+        console.warn('Score submit failed', error);
+      }
+    }
+
+    async function openLeaderboard(source) {
+      state.overlayBeforeLeaderboard = source || (startOverlay.style.display !== 'none' ? 'start' : (messageOverlay.style.display !== 'none' ? 'message' : 'game'));
+      state.leaderboardOpen = true;
+      startOverlay.style.display = 'none';
+      messageOverlay.style.display = 'none';
+      nameOverlay.style.display = 'none';
+      leaderboardOverlay.style.display = 'flex';
+      setLeaderboardLoading('Загрузка...');
+      await fetchLeaderboard();
+    }
+
+    function closeLeaderboard() {
+      state.leaderboardOpen = false;
+      leaderboardOverlay.style.display = 'none';
+      if (state.overlayBeforeLeaderboard === 'start') startOverlay.style.display = 'flex';
+      else if (state.overlayBeforeLeaderboard === 'message') messageOverlay.style.display = 'flex';
+    }
+
+    function openNameOverlay(source) {
+      state.nameOverlaySource = source || (startOverlay.style.display !== 'none' ? 'start' : 'game');
+      browserNameError.textContent = '';
+      browserNameInput.value = state.browserPlayerName || '';
+      startOverlay.style.display = 'none';
+      messageOverlay.style.display = 'none';
+      leaderboardOverlay.style.display = 'none';
+      nameOverlay.style.display = 'flex';
+      setTimeout(() => browserNameInput.focus(), 0);
+    }
+
+    function closeNameOverlay() {
+      nameOverlay.style.display = 'none';
+      if (state.nameOverlaySource === 'start') startOverlay.style.display = 'flex';
+    }
+
+    function saveBrowserName() {
+      const cleanName = sanitizeBrowserName(browserNameInput.value);
+      if (!cleanName) {
+        browserNameError.textContent = 'Введи имя от 1 до 24 символов.';
+        browserNameInput.focus();
+        return false;
+      }
+      state.browserPlayerName = cleanName;
+      writeBrowserName(cleanName);
+      updatePlatformBadge();
+      browserNameError.textContent = '';
+      closeNameOverlay();
+      return true;
+    }
+
+    function ensureBrowserNameForStart() {
+      if (state.telegramUser) return true;
+      state.browserPlayerName = readBrowserName();
+      updatePlatformBadge();
+      if (state.browserPlayerName) return true;
+      openNameOverlay('start');
+      return false;
+    }
+
+    function resetGame() {
+      state.playerScore = 0;
+      state.aiScore = 0;
+      state.started = false;
+      state.running = false;
+      state.gameOver = false;
+      state.dragging = false;
+      state.servePending = false;
+      state.serveCountdownText = '';
+      centerPaddles();
+      centerBall();
+      world.ballVX = 0;
+      world.ballVY = 0;
+      updateScore();
+      startOverlay.style.display = 'flex';
+      messageOverlay.style.display = 'none';
+      leaderboardOverlay.style.display = 'none';
+      nameOverlay.style.display = 'none';
+      resumeBtn.style.display = '';
+      restartOverlayBtn.textContent = 'Рестарт';
+      draw();
+    }
+
+    function startGame() {
+      centerPaddles();
+      state.started = true;
+      state.running = true;
+      state.gameOver = false;
+      state.leaderboardOpen = false;
+      startOverlay.style.display = 'none';
+      messageOverlay.style.display = 'none';
+      leaderboardOverlay.style.display = 'none';
+      nameOverlay.style.display = 'none';
+      resumeBtn.style.display = '';
+      restartOverlayBtn.textContent = 'Рестарт';
+      if (!state.servePending && world.ballVX === 0 && world.ballVY === 0) beginServe(Math.random() > 0.5 ? 1 : -1);
+    }
+
+    function pauseGame() {
+      if (!state.started || state.gameOver) return;
+      state.running = false;
+      messageTitle.textContent = 'Пауза';
+      messageText.textContent = 'Нажми продолжить, чтобы вернуться в игру.';
+      resumeBtn.style.display = '';
+      restartOverlayBtn.textContent = 'Рестарт';
+      messageOverlay.style.display = 'flex';
+    }
+
+    function resumeGame(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      if (state.gameOver) return;
+      state.running = true;
+      state.dragging = false;
+      state.leaderboardOpen = false;
+      messageOverlay.style.display = 'none';
+      leaderboardOverlay.style.display = 'none';
+      nameOverlay.style.display = 'none';
+    }
+
+    async function finishGame(playerWon) {
+      state.running = false;
+      state.gameOver = true;
+      messageTitle.textContent = playerWon ? 'Победа!' : 'Поражение';
+      messageText.textContent = playerWon ? 'Ты обыграл компьютер. Можно сыграть еще раз.' : 'Компьютер победил. Попробуй еще раз.';
+      resumeBtn.style.display = 'none';
+      restartOverlayBtn.textContent = 'Еще раз';
+      messageOverlay.style.display = 'flex';
+      if(isTelegram){
+        await submitScore(state.playerScore);
+      }
+    }
+
+    function movePlayerKeyboard() {
+      let dy = 0;
+      if (state.keys.w || state.keys.ArrowUp) dy -= world.playerSpeed;
+      if (state.keys.s || state.keys.ArrowDown) dy += world.playerSpeed;
+      if (dy === 0) return;
+      state.playerTargetY = clamp(state.playerTargetY + dy, 0, state.height - world.paddleHeight);
+    }
+
+    function updatePlayerPaddleSmoothing() {
+      const smoothing = state.isMobileLike
+        ? (window.matchMedia('(orientation: portrait)').matches ? 0.3 : 0.22)
+        : 0.36;
+      if (playerIsLeft()) {
+        world.leftY += (state.playerTargetY - world.leftY) * smoothing;
+        world.leftY = clamp(world.leftY, 0, state.height - world.paddleHeight);
+      } else {
+        world.rightY += (state.playerTargetY - world.rightY) * smoothing;
+        world.rightY = clamp(world.rightY, 0, state.height - world.paddleHeight);
+      }
+    }
+
+    function moveAI() {
+      const ai = aiPaddle();
+      const currentY = ai.side === 'left' ? world.leftY : world.rightY;
+      const center = currentY + world.paddleHeight / 2;
+      const mobileError = state.isMobileLike ? (Math.random() - 0.5) * (world.paddleHeight * 0.55) : (Math.random() - 0.5) * 12;
+      const trackingBias = state.isMobileLike ? world.ballVY * 1.5 : world.ballVY * 0.6;
+      const target = world.ballY + mobileError + trackingBias;
+      const diff = target - center;
+      let nextY = currentY;
+      const threshold = state.isMobileLike ? 16 : 10;
+      if (Math.abs(diff) > threshold) nextY += Math.sign(diff) * world.aiSpeed * 0.6935;
+      nextY = clamp(nextY, 0, state.height - world.paddleHeight);
+      if (ai.side === 'left') world.leftY = nextY;
+      else world.rightY = nextY;
+    }
+
+    function intersects(ball, paddle) {
+      return ball.x - ball.r < paddle.x + paddle.w && ball.x + ball.r > paddle.x && ball.y - ball.r < paddle.y + paddle.h && ball.y + ball.r > paddle.y;
+    }
+
+    function bounceFromPaddle(paddle, direction) {
+      const relative = paddle.y + paddle.h / 2 - world.ballY;
+      const normalized = relative / (paddle.h / 2);
+      const bounceAngle = normalized * 1.08;
+      const speed = Math.min(Math.hypot(world.ballVX, world.ballVY) + 0.42, world.maxBallSpeed);
+      world.ballVX = speed * Math.cos(bounceAngle) * direction;
+      world.ballVY = -speed * Math.sin(bounceAngle);
+      world.ballX = direction > 0 ? paddle.x + paddle.w + world.ballSize / 2 : paddle.x - world.ballSize / 2;
+    }
+
+    function updateBall() {
+      world.ballX += world.ballVX;
+      world.ballY += world.ballVY;
+      if (world.ballY - world.ballSize / 2 <= 0 || world.ballY + world.ballSize / 2 >= state.height) {
+        world.ballVY *= -1;
+        world.ballY = clamp(world.ballY, world.ballSize / 2, state.height - world.ballSize / 2);
+      }
+
+      const ball = { x: world.ballX, y: world.ballY, r: world.ballSize / 2 };
+      const pp = playerPaddle();
+      const ap = aiPaddle();
+
+      if (intersects(ball, pp) && world.ballVX < 0 && pp.side === 'left') bounceFromPaddle(pp, 1);
+      if (intersects(ball, pp) && world.ballVX > 0 && pp.side === 'right') bounceFromPaddle(pp, -1);
+      if (intersects(ball, ap) && world.ballVX < 0 && ap.side === 'left') bounceFromPaddle(ap, 1);
+      if (intersects(ball, ap) && world.ballVX > 0 && ap.side === 'right') bounceFromPaddle(ap, -1);
+
+      if (world.ballX < -30) {
+        if (playerIsLeft()) {
+          state.aiScore += 1;
+          updateScore();
+          if (state.aiScore >= state.winningScore) finishGame(false);
+          else beginServe(1);
+        } else {
+          state.playerScore += 1;
+          updateScore();
+          beginServe(-1);
+        }
+      }
+
+      if (world.ballX > state.width + 30) {
+        if (playerIsLeft()) {
+          state.playerScore += 1;
+          updateScore();
+          beginServe(-1);
+        } else {
+          state.aiScore += 1;
+          updateScore();
+          if (state.aiScore >= state.winningScore) finishGame(false);
+          else beginServe(1);
+        }
+      }
+    }
+
+    function drawRoundedRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawCenterLine() {
+      const palette = getThemePalette();
+      ctx.strokeStyle = palette.line;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([12, 12]);
+      ctx.beginPath();
+      ctx.moveTo(state.width / 2, 0);
+      ctx.lineTo(state.width / 2, state.height);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function drawServeOverlay() {
+      if (!state.servePending) return;
+      const elapsed = performance.now() - state.serveStartAt;
+      const remaining = Math.max(0, state.serveDelayMs - elapsed);
+      const step = Math.ceil(remaining / 300);
+      state.serveCountdownText = remaining <= 120 ? 'GO!' : String(Math.max(1, step));
+      const pulse = 1 + 0.08 * Math.sin(elapsed / 70);
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `bold ${Math.floor(Math.min(state.width, state.height) * 0.12 * pulse)}px Arial`;
+      ctx.fillStyle = 'rgba(248, 250, 252, 0.92)';
+      ctx.fillText(state.serveCountdownText, state.width / 2, state.height / 2);
+      ctx.font = `bold ${Math.floor(Math.min(state.width, state.height) * 0.03)}px Arial`;
+      ctx.fillStyle = 'rgba(203, 213, 225, 0.85)';
+      ctx.fillText('Подача', state.width / 2, state.height / 2 + Math.min(state.width, state.height) * 0.1);
+      ctx.restore();
+    }
+
+    function draw() {
+      const palette = getThemePalette();
+      ctx.clearRect(0, 0, state.width, state.height);
+      const bg = ctx.createLinearGradient(0, 0, 0, state.height);
+      bg.addColorStop(0, palette.top);
+      bg.addColorStop(1, palette.bottom);
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, state.width, state.height);
+      if (state.theme === 'neon' || state.theme === 'sunset') {
+        ctx.fillStyle = palette.glow;
+        ctx.beginPath();
+        ctx.arc(state.width * 0.2, state.height * 0.2, Math.min(state.width, state.height) * 0.18, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      drawCenterLine();
+      const pp = playerPaddle();
+      const ap = aiPaddle();
+      ctx.fillStyle = palette.player;
+      drawRoundedRect(pp.x, pp.y, pp.w, pp.h, 10);
+      ctx.fillStyle = palette.ai;
+      drawRoundedRect(ap.x, ap.y, ap.w, ap.h, 10);
+      if (state.theme === 'neon') {
+        ctx.save();
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = palette.ball;
+      }
+      ctx.beginPath();
+      ctx.fillStyle = palette.ball;
+      ctx.arc(world.ballX, world.ballY, world.ballSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+      if (state.theme === 'neon') ctx.restore();
+      drawServeOverlay();
+    }
+
+    function movePaddleFromClientY(clientY, rect) {
+      const ratio = (clientY - rect.top) / rect.height;
+      const targetY = ratio * state.height - world.paddleHeight / 2;
+      const portraitNudge = window.matchMedia('(max-width: 900px) and (orientation: portrait)').matches ? (world.paddleHeight * 0.08) : 0;
+      state.playerTargetY = clamp(targetY - portraitNudge, 0, state.height - world.paddleHeight);
+    }
+
+    function tick() {
+      if (state.running && !state.leaderboardOpen && nameOverlay.style.display === 'none') {
+        movePlayerKeyboard();
+        updatePlayerPaddleSmoothing();
+        moveAI();
+        if (state.servePending) {
+          const elapsed = performance.now() - state.serveStartAt;
+          if (elapsed >= state.serveDelayMs) releaseServe();
+        } else {
+          updateBall();
+        }
+      }
+      draw();
+      state.animationId = requestAnimationFrame(tick);
+    }
+
+    function bindDragArea(element) {
+      const getPoint = (event) => event.touches ? event.touches[0] : event;
+      const allowed = (event) => {
+        if (state.leaderboardOpen || nameOverlay.style.display !== 'none' || startOverlay.style.display !== 'none' || messageOverlay.style.display !== 'none') return false;
+        const point = getPoint(event);
+        const rect = element.getBoundingClientRect();
+        const portraitAssist = window.matchMedia('(max-width: 900px) and (orientation: portrait)').matches ? rect.width * 0.12 : 0;
+        const leftHalf = point.clientX <= rect.left + rect.width / 2 + portraitAssist;
+        const rightHalf = point.clientX >= rect.left + rect.width / 2 - portraitAssist;
+        return playerIsLeft() ? leftHalf : rightHalf;
+      };
+      const start = (event) => {
+        if (!allowed(event)) return;
+        event.preventDefault();
+        state.dragging = true;
+        const point = getPoint(event);
+        movePaddleFromClientY(point.clientY, element.getBoundingClientRect());
+      };
+      const move = (event) => {
+        if (!state.dragging || !allowed(event)) return;
+        event.preventDefault();
+        const point = getPoint(event);
+        movePaddleFromClientY(point.clientY, element.getBoundingClientRect());
+      };
+      const end = () => { state.dragging = false; };
+      element.addEventListener('touchstart', start, { passive: false });
+      element.addEventListener('touchmove', move, { passive: false });
+      element.addEventListener('touchend', end);
+      element.addEventListener('touchcancel', end);
+      element.addEventListener('pointerdown', start);
+      element.addEventListener('pointermove', move);
+      element.addEventListener('pointerup', end);
+      element.addEventListener('pointercancel', end);
+      element.addEventListener('pointerleave', end);
+    }
+
+    function bindControls() {
+      const stopOverlayPointer = (event) => { event.stopPropagation(); };
+      [
+        startOverlay, messageOverlay, leaderboardOverlay, nameOverlay,
+        startBtn, resetOverlayBtn, sideLeftBtn, sideRightBtn,
+        themeClassicBtn, themeNeonBtn, themeSunsetBtn, themeMonoBtn,
+        showLeaderboardFromStartBtn, showLeaderboardFromResultBtn,
+        resumeBtn, restartOverlayBtn, closeLeaderboardBtn, refreshLeaderboardBtn,
+        saveBrowserNameBtn, cancelBrowserNameBtn, changeNameBtn,
+        leaderboardBtn, pauseTopBtn, fullscreenBtn
+      ].forEach((element) => {
+        if (!element) return;
+        element.addEventListener('pointerdown', stopOverlayPointer);
+        element.addEventListener('touchstart', stopOverlayPointer, { passive: false });
+      });
+
+      const wheelHandler = (event) => {
+        if (!state.isDesktopLike || state.leaderboardOpen || nameOverlay.style.display !== 'none' || startOverlay.style.display !== 'none' || messageOverlay.style.display !== 'none') return;
+        event.preventDefault();
+        const maxStep = Math.max(12, state.height * (window.matchMedia('(orientation: portrait)').matches ? 0.04 : 0.05));
+        const move = clamp(event.deltaY * 0.35, -maxStep, maxStep);
+        state.playerTargetY = clamp(state.playerTargetY + move, 0, state.height - world.paddleHeight);
+      };
+
+      bindDragArea(boardWrap);
+      boardWrap.addEventListener('wheel', wheelHandler, { passive: false });
+
+      window.addEventListener('keydown', (event) => {
+        state.keys[event.key] = true;
+        if (event.key === ' ') {
+          event.preventDefault();
+          if (!state.started) startGame();
+          else if (state.running) pauseGame();
+          else if (!state.gameOver) resumeGame(event);
+        }
+        if (event.key.toLowerCase() === 'r') resetGame();
+        if (!state.telegramUser && event.key === 'F2') {
+          event.preventDefault();
+          openNameOverlay('game');
+        }
+      });
+      window.addEventListener('keyup', (event) => { state.keys[event.key] = false; });
+
+      const pauseHandler = (event) => {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        if (state.leaderboardOpen || nameOverlay.style.display !== 'none') return;
+        if (!state.started) {
+          startGame();
+          return;
+        }
+        if (state.running) pauseGame();
+        else if (!state.gameOver) resumeGame(event);
+      };
+
+      startBtn.addEventListener('click', startGame);
+      resetOverlayBtn.addEventListener('click', resetGame);
+      restartOverlayBtn.addEventListener('click', resetGame);
+      resumeBtn.addEventListener('click', resumeGame);
+      resumeBtn.addEventListener('touchend', resumeGame, { passive: false });
+      pauseTopBtn.addEventListener('click', pauseHandler);
+      pauseTopBtn.addEventListener('touchend', pauseHandler, { passive: false });
+
+      sideLeftBtn.addEventListener('click', () => setPlayerSide('left'));
+      sideRightBtn.addEventListener('click', () => setPlayerSide('right'));
+      themeClassicBtn.addEventListener('click', () => setTheme('classic'));
+      themeNeonBtn.addEventListener('click', () => setTheme('neon'));
+      themeSunsetBtn.addEventListener('click', () => setTheme('sunset'));
+      themeMonoBtn.addEventListener('click', () => setTheme('mono'));
+
+      leaderboardBtn.addEventListener('click', () => openLeaderboard('game'));
+      showLeaderboardFromStartBtn.addEventListener('click', () => openLeaderboard('start'));
+      showLeaderboardFromResultBtn.addEventListener('click', () => openLeaderboard('message'));
+      closeLeaderboardBtn.addEventListener('click', closeLeaderboard);
+      refreshLeaderboardBtn.addEventListener('click', fetchLeaderboard);
+
+      changeNameBtn.addEventListener('click', () => openNameOverlay('game'));
+      saveBrowserNameBtn.addEventListener('click', saveBrowserName);
+      cancelBrowserNameBtn.addEventListener('click', closeNameOverlay);
+      browserNameInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          saveBrowserName();
+        }
+      });
+
+      fullscreenBtn.addEventListener('click', () => {
+        if (tg && typeof tg.requestFullscreen === 'function') tg.requestFullscreen();
+        else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+      });
+
+      let resizeRaf = null;
+      const handleResize = () => {
+        if (resizeRaf) cancelAnimationFrame(resizeRaf);
+        resizeRaf = requestAnimationFrame(resizeCanvas);
+      };
+      window.addEventListener('resize', () => {
+        state.isDesktopLike = matchMedia('(pointer:fine)').matches;
+        state.isMobileLike = matchMedia('(pointer:coarse)').matches;
+        handleResize();
+      });
+      window.addEventListener('orientationchange', handleResize);
+      if (window.visualViewport) window.visualViewport.addEventListener('resize', handleResize);
+    }
+
+    function runSelfTests() {
+      console.assert(clamp(5, 0, 10) === 5, 'clamp keeps normal values');
+      console.assert(clamp(-1, 0, 10) === 0, 'clamp lower bound');
+      console.assert(clamp(11, 0, 10) === 10, 'clamp upper bound');
+      console.assert(intersects({ x: 20, y: 20, r: 5 }, { x: 10, y: 10, w: 20, h: 30 }) === true, 'collision true');
+      console.assert(intersects({ x: 100, y: 100, r: 5 }, { x: 10, y: 10, w: 20, h: 30 }) === false, 'collision false');
+      console.assert(normalizeLeaderboardEntry({ user_id: 1, display_name: 'A', score: '7' }).score === 7, 'leaderboard normalize score');
+      console.assert(sanitizeBrowserName('  <abc>   xyz  ') === 'abc xyz', 'browser name sanitization works');
+      setPlayerSide('right');
+      console.assert(playerIsLeft() === false, 'player side should switch to right');
+      setPlayerSide('left');
+      console.assert(playerIsLeft() === true, 'player side should switch back to left');
+      setTheme('neon');
+      console.assert(state.theme === 'neon', 'theme should switch to neon');
+      setTheme('classic');
+      console.assert(state.theme === 'classic', 'theme should switch back to classic');
+      state.isMobileLike = true;
+      state.playerSide = 'left';
+      world.leftY = 0;
+      state.playerTargetY = 100;
+      updatePlayerPaddleSmoothing();
+      console.assert(world.leftY > 0, 'mobile smoothing should move paddle');
+      state.isMobileLike = false;
+    }
+
+    function bootstrap() {
+      initTelegram();
+      ensureBrowserNameForUI();
+      bindControls();
+      resizeCanvas();
+      resetGame();
+      fetchLeaderboard();
+      runSelfTests();
+      if (!state.animationId) state.animationId = requestAnimationFrame(tick);
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>
